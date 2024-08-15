@@ -1,48 +1,68 @@
 import argparse
 import json
 import socket, threading
+import time
 from contextlib import closing
 
 
 class TcpClient(threading.Thread):
-    def __init__(self, server_host, server_port, app_port,user_port):
+    def __init__(self, server_host, server_port, app_port, user_port):
         self.server_host = server_host
         self.server_port = server_port
         self.app_port = app_port
         threading.Thread.__init__(self)
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.connect((server_host, server_port))
-        data={'msg':"请求连接", "port":user_port}
-        data=json.dumps(data).encode('utf-8')
+        data = {'msg': "请求连接", "port": user_port}
+        data = json.dumps(data).encode('utf-8')
+        data = data + b"#END#"
         self.s.send(data)
         self.app = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.app.connect(("127.0.0.1", app_port))
+        self.heartbeat_counter = {}  # 心跳包计数器
 
-    def app_to_server(self,data):
-            try:
-                self.s.sendall(data)
-                print(f"[*] {self.app.getpeername()}-->{self.server_host}:{self.server_port} 数据发送成功")
-            except Exception as e:
-                print(f"[!] {self.app.getpeername()}-->{self.server_host}:{self.server_port} 数据发送失败: {e}")
+    #心跳包处理
+    # def handle_heartbeat(self, conn):
+    #     # 接收来自客户端连接的数据
+    #     while True:
+    #         data = conn.recv(1024)
+    #         if data ==b'heartbeat':
+    #             counter = self.heartbeat_counter.get(conn)
+    #             if not counter:
+    #                 counter = 0
+    #             counter += 1
+    #             self.heartbeat_counter[conn] = time.time()
 
 
-    def server_to_app(self,data):
+        # 每30秒检测超时连接
 
-            try:
-                self.app.sendall(data)
-                print(f"[*]{self.server_host}:{self.app_port}-->{self.app.getpeername()} 数据发送成功")
-            except Exception as e:
-                print(f"[!] {self.server_host}:{self.app_port}-->{self.app.getpeername()} 数据发送失败: {e}")
+    def app_to_server(self, data):
+        try:
+            self.s.sendall(data)
+            print(f"[*] {self.app.getpeername()}-->{self.server_host}:{self.server_port} 数据发送成功")
+        except Exception as e:
+            print(f"[!] {self.app.getpeername()}-->{self.server_host}:{self.server_port} 数据发送失败: {e}")
 
+    def server_to_app(self, data):
+
+        try:
+            self.app.sendall(data)
+            print(f"[*]{self.server_host}:{self.app_port}-->{self.app.getpeername()} 数据发送成功")
+        except Exception as e:
+            print(f"[!] {self.server_host}:{self.app_port}-->{self.app.getpeername()} 数据发送失败: {e}")
 
     def app_run(self):
         while True:
             try:
                 data = self.app.recv(2048)
-                print(f"[*] 接受到来自{self.app.getpeername()}的数据")
+                print(f"[*] 接受到来自应用端的数据")
             except Exception as e:
-                print(f"[!] 接收{self.app.getpeername()}数据失败: {e}")
-                break
+                print(f"[!] 接收应用数据失败，应用端已断开连接: {e}")
+                self.s.close()
+                self.app.close()
+                print(f"[*] 服务端已断开连接，应用端已断开连接")
+                return
+
             if not data:
                 break
             threading.Thread(target=self.app_to_server, args=(data,)).start()
@@ -51,26 +71,32 @@ class TcpClient(threading.Thread):
         while True:
             try:
                 data = self.s.recv(2048)
-                print(f"[*] 接受到来自{self.s.getpeername()}的数据")
+                print(f"[*] 接受到来自服务端的数据")
             except Exception as e:
-                print(f"[!] 接收{self.s.getpeername()}数据失败: {e}")
-                break
+                print(f"[!] 接收服务端数据失败,服务端已断开连接: {e}")
+                self.s.close()
+                self.app.close()
+                print(f"[*] 服务端已断开连接，应用端已断开连接")
+                return
             if not data:
                 break
             threading.Thread(target=self.server_to_app, args=(data,)).start()
+
     def run(self):
         print(f"[*] 客户端初始化成功")
         threading.Thread(target=self.client_run).start()
         threading.Thread(target=self.app_run).start()
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='基本用法')
     parser.add_help = True
-    parser.add_argument('-i', '--server_host', type=str, required=True,help='服务器地址', default='127.0.0.1')
-    parser.add_argument('-sp', '--server_port', type=int, required=False,help='服务器端口', default=8081)
-    parser.add_argument('-ap', '--app_port', type=int, required=True,help='应用端口', default=22)
-    parser.add_argument('-up', '--user_port', type=int, required=False,help='用户端口', default=8082)
+    parser.add_argument('-i', '--server_host', type=str, required=True, help='服务器地址', default='127.0.0.1')
+    parser.add_argument('-sp', '--server_port', type=int, required=False, help='服务器端口', default=8081)
+    parser.add_argument('-ap', '--app_port', type=int, required=True, help='应用端口', default=22)
+    parser.add_argument('-up', '--user_port', type=int, required=False, help='用户端口', default=8082)
 
     args = parser.parse_args()
 
-    TcpClient(server_port=args.server_port, server_host=args.server_host, app_port=args.app_port, user_port=args.user_port).run()
+    TcpClient(server_port=args.server_port, server_host=args.server_host, app_port=args.app_port,
+              user_port=args.user_port).run()

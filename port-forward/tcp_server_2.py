@@ -1,6 +1,7 @@
 import argparse
 import json
 import socket, threading
+import time
 
 
 class TcpServer(threading.Thread):
@@ -28,8 +29,8 @@ class TcpServer(threading.Thread):
                 # 接收数据缓存大小
                 data = conn_receiver.recv(2048)
                 print(f"接受到来自{conn_receiver.getpeername()}的数据")
-            except Exception:
-                print("[-] 关闭: 映射请求已关闭.")
+            except Exception as e:
+                print(f"[-] 关闭: 映射请求已关闭:{e}.")
                 break
             if not data:
                 break
@@ -45,30 +46,29 @@ class TcpServer(threading.Thread):
         conn_sender.close()
         return
 
-    # 端口映射请求处理
-    def tcp_mapping(self, local_conn, remote_ip, remote_port):
-        remote_conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            remote_conn.connect((remote_ip, remote_port))
-        except Exception:
-            local_conn.close()
-            print("[x] 错误: 无法连接到 {}:{} 远程服务器".format(remote_ip, remote_port))
-            return
-        threading.Thread(target=self.single_tcp_transmission, args=(local_conn, remote_conn)).start()
-        threading.Thread(target=self.single_tcp_transmission, args=(remote_conn, local_conn)).start()
-        return
+    # # 心跳包检测
+    # def heartbeat_check(self, conn):
+    #     while True:
+    #         try:
+    #             conn.sendall(b"heartbeat")
+    #         except Exception:
+    #             print("[-] 关闭: 心跳包检测已关闭.")
+    #             break
+    #         time.sleep(5)
+
     def tcp_mapping(self,local_conn, remote_conn):
         threading.Thread(target=self.single_tcp_transmission, args=(local_conn, remote_conn)).start()
         threading.Thread(target=self.single_tcp_transmission, args=(remote_conn, local_conn)).start()
 
     def run(self):
-        print(f"[+]初始化完成, 服务端监听端口: {self.server_port}, {self.usr_port}")
+        print(f"[+] 初始化完成, 服务端监听端口: {self.server_port}")
         while True:
             server_conn, server_addr = self.server_socket.accept()
             print(f"[+]  {server_addr}服务端连接成功")
 
             temp_data = server_conn.recv(2048)
-            temp_data = json.loads(temp_data.decode("utf-8"))
+
+            temp_data = json.loads(temp_data.decode("utf-8").split("#END#")[0])
             if temp_data['msg'] == "请求连接":
                 self.usr_port = temp_data['port']
                 # 等待用户连接
@@ -76,9 +76,11 @@ class TcpServer(threading.Thread):
                 self.user_socket.bind(("127.0.0.1",self.usr_port))
                 self.user_socket.listen(10)
                 user_conn, user_addr = self.user_socket.accept()
-                print(f"[+] {user_addr}新用户连接成功")
-                self.user_client_pool[user_conn] = server_conn
-                threading.Thread(target=self.tcp_mapping, args=(self.user_client_pool[user_conn], user_conn)).start()
+                print(f"[+] {user_addr}新用户连接成功,正在监听用户端口:{self.usr_port}")
+                self.usr_pool.append(user_conn)
+                self.client_pool.append(server_conn)
+                # threading.Thread(target=self.heartbeat_check, args=(server_conn,)).start()
+                threading.Thread(target=self.tcp_mapping, args=(server_conn, user_conn)).start()
 
 
 
