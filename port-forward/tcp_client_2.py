@@ -1,17 +1,20 @@
 import argparse
+import json
 import socket, threading
 from contextlib import closing
 
 
 class TcpClient(threading.Thread):
-    def __init__(self, server_host, server_port, app_port):
+    def __init__(self, server_host, server_port, app_port,user_port):
         self.server_host = server_host
         self.server_port = server_port
         self.app_port = app_port
         threading.Thread.__init__(self)
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.s.connect((server_host, server_port))
-
+        data={'msg':"请求连接", "port":user_port}
+        data=json.dumps(data).encode('utf-8')
+        self.s.send(data)
         self.app = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.app.connect(("127.0.0.1", app_port))
 
@@ -57,14 +60,17 @@ class TcpClient(threading.Thread):
             threading.Thread(target=self.server_to_app, args=(data,)).start()
     def run(self):
         print(f"[*] 客户端初始化成功")
-        threading.Thread(target=self.app_run).start()
         threading.Thread(target=self.client_run).start()
+        threading.Thread(target=self.app_run).start()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='基本用法')
     parser.add_help = True
-    parser.add_argument('-ip', '--server_host', type=str, required=True,help='服务器地址', default='127.0.0.1')
+    parser.add_argument('-i', '--server_host', type=str, required=True,help='服务器地址', default='127.0.0.1')
     parser.add_argument('-sp', '--server_port', type=int, required=False,help='服务器端口', default=8081)
     parser.add_argument('-ap', '--app_port', type=int, required=True,help='应用端口', default=22)
+    parser.add_argument('-up', '--user_port', type=int, required=False,help='用户端口', default=8082)
+
     args = parser.parse_args()
 
-    TcpClient(server_port=args.server_port, server_host=args.server_host, app_port=args.app_port).run()
+    TcpClient(server_port=args.server_port, server_host=args.server_host, app_port=args.app_port, user_port=args.user_port).run()
