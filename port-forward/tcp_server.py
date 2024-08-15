@@ -1,12 +1,18 @@
 import argparse
 import json
 import socket, threading
-import time
+from log.log import Logger
+
+
+
+
+
 
 
 class TcpServer(threading.Thread):
     def __init__(self, server_port):
         threading.Thread.__init__(self)
+
         self.server_port = server_port
 
         # 建立服务端监听
@@ -28,20 +34,18 @@ class TcpServer(threading.Thread):
             try:
                 # 接收数据缓存大小
                 data = conn_receiver.recv(2048)
-                print(f"接受到来自{conn_receiver.getpeername()}的数据")
+                Logger().info(f"接收到来自{conn_receiver.getpeername()}的数据")
             except Exception as e:
-                print(f"[-] 关闭: 映射请求已关闭:{e}.")
+                Logger().warning(f"接收数据时出错:{e}")
                 break
             if not data:
                 break
             try:
                 conn_sender.sendall(data)
-                print(f"[*]{conn_receiver.getpeername()}-->{conn_sender.getpeername()} 数据已发送")
+                Logger().info(f"向{conn_receiver.getpeername()}-->{conn_sender.getpeername()}发送数据")
             except Exception:
-                print("[-] 错误: 发送数据时出错.")
+                Logger().error("发送数据时出错")
                 break
-            print("[+] 映射请求: {} ---> 传输到: {} ---> {} bytes"
-                  .format(conn_receiver.getpeername(), conn_sender.getpeername(), len(data)))
         conn_receiver.close()
         conn_sender.close()
         return
@@ -61,13 +65,13 @@ class TcpServer(threading.Thread):
         threading.Thread(target=self.single_tcp_transmission, args=(remote_conn, local_conn)).start()
 
     def run(self):
-        print(f"[+] 初始化完成, 服务端监听端口: {self.server_port}")
+
+
+        Logger().info( f"服务端已启动,监听端口:{self.server_port}")
         while True:
             server_conn, server_addr = self.server_socket.accept()
-            print(f"[+]  {server_addr}服务端连接成功")
-
+            Logger().info(f" {server_addr}服务端连接成功")
             temp_data = server_conn.recv(2048)
-
             temp_data = json.loads(temp_data.decode("utf-8").split("#END#")[0])
             if temp_data['msg'] == "请求连接":
                 self.usr_port = temp_data['port']
@@ -76,7 +80,7 @@ class TcpServer(threading.Thread):
                 self.user_socket.bind(("127.0.0.1",self.usr_port))
                 self.user_socket.listen(10)
                 user_conn, user_addr = self.user_socket.accept()
-                print(f"[+] {user_addr}新用户连接成功,正在监听用户端口:{self.usr_port}")
+                Logger().info(f"{user_addr}用户连接成功,正在监听用户端口:{self.usr_port}")
                 self.usr_pool.append(user_conn)
                 self.client_pool.append(server_conn)
                 # threading.Thread(target=self.heartbeat_check, args=(server_conn,)).start()

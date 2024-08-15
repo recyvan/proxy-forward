@@ -1,8 +1,7 @@
 import argparse
 import json
 import socket, threading
-import time
-from contextlib import closing
+from log.log import Logger
 
 
 class TcpClient(threading.Thread):
@@ -39,28 +38,31 @@ class TcpClient(threading.Thread):
     def app_to_server(self, data):
         try:
             self.s.sendall(data)
-            print(f"[*] {self.app.getpeername()}-->{self.server_host}:{self.server_port} 数据发送成功")
+            Logger.info(f"{self.app.getpeername()}-->{self.server_host}:{self.server_port} 数据发送成功")
         except Exception as e:
-            print(f"[!] {self.app.getpeername()}-->{self.server_host}:{self.server_port} 数据发送失败: {e}")
+            Logger.error(f"数据发送失败: {e}")
+            # print(f"[!] {self.app.getpeername()}-->{self.server_host}:{self.server_port} ")
 
     def server_to_app(self, data):
 
         try:
             self.app.sendall(data)
-            print(f"[*]{self.server_host}:{self.app_port}-->{self.app.getpeername()} 数据发送成功")
+            Logger.info(f"{self.server_host}:{self.app_port}-->{self.app.getpeername()} 数据发送成功")
+
         except Exception as e:
-            print(f"[!] {self.server_host}:{self.app_port}-->{self.app.getpeername()} 数据发送失败: {e}")
+            Logger.error(f"数据发送失败: {e}")
+            # print(f"[!] {self.server_host}:{self.app_port}-->{self.app.getpeername()} 数据发送失败: {e}")
 
     def app_run(self):
         while True:
             try:
                 data = self.app.recv(2048)
-                print(f"[*] 接受到来自应用端的数据")
+                Logger.info(f"接受到来自应用端的数据")
             except Exception as e:
-                print(f"[!] 接收应用数据失败，应用端已断开连接: {e}")
+                Logger.error(f"接收应用数据失败，应用端已断开连接: {e}")
                 self.s.close()
                 self.app.close()
-                print(f"[*] 服务端已断开连接，应用端已断开连接")
+                Logger.warning("服务端已断开连接，应用端已断开连接")
                 return
 
             if not data:
@@ -71,19 +73,19 @@ class TcpClient(threading.Thread):
         while True:
             try:
                 data = self.s.recv(2048)
-                print(f"[*] 接受到来自服务端的数据")
+                Logger.info(f"接受到来自服务端的数据")
             except Exception as e:
-                print(f"[!] 接收服务端数据失败,服务端已断开连接: {e}")
+                Logger.error(f"接收服务端数据失败,服务端已断开连接: {e}")
                 self.s.close()
                 self.app.close()
-                print(f"[*] 服务端已断开连接，应用端已断开连接")
+                Logger.warning("服务端已断开连接，应用端已断开连接")
                 return
             if not data:
                 break
             threading.Thread(target=self.server_to_app, args=(data,)).start()
 
     def run(self):
-        print(f"[*] 客户端初始化成功")
+        Logger.info(f"客户端初始化成功")
         threading.Thread(target=self.client_run).start()
         threading.Thread(target=self.app_run).start()
 
