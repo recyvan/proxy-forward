@@ -4,8 +4,8 @@ import subprocess
 
 from socketserver import ThreadingTCPServer
 
-import tcpc
-import socket_5
+from proxyclient import tcpc
+from proxyclient import socket_5
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='基本用法')

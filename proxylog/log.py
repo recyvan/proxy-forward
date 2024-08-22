@@ -11,7 +11,9 @@ class Logger(object):
         self.logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        fh = logging.FileHandler('roxylog.txt')
+        fh = logging.FileHandler('../proxylog.txt')
+
+
         fh.setLevel(logging.DEBUG)
         my_formatter = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)s]%(message)s')
         ch.setFormatter(my_formatter)
