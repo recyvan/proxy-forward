@@ -9,7 +9,7 @@ import time
 from proxylog.log import Logger
 
 
-
+## 客户端
 class TcpClient(threading.Thread):
     def __init__(self, server_host, server_port, app_host,app_port, user_port):
         self.server_host = server_host
