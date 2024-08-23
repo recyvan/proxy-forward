@@ -2,10 +2,8 @@ import argparse
 
 import subprocess
 
-from socketserver import ThreadingTCPServer
-
 from proxyclient import tcpc
-from proxyclient import socket_5
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='基本用法')
@@ -31,17 +29,20 @@ if __name__ == '__main__':
                        app_port=args.app_port, user_port=args.user_port).run()
     elif args.type == 'socket5':
         if args.socket_username == '' and args.socket_password == '':
-            # socket_5.Socks5Handler.authenticated = 0
-            # with ThreadingTCPServer(('0.0.0.0', args.socket_port), socket_5.Socks5Handler) as server:
-            #     server.serve_forever()
             subprocess.Popen(['python', 'socket_5.py','','','0',str(args.socket_port)])
-            tcpc.TcpClient(server_port=args.server_port, server_host=args.server_host,app_host=args.app_host ,app_port=args.socket_port,
+            tcpc.TcpClient(server_port=args.server_port,
+                           server_host=args.server_host,
+                           app_host=args.app_host,
+                           app_port=args.socket_port,
+                           user_port=args.user_port).run()
+        elif args.socket_username != '' and args.socket_password != '':
+            subprocess.Popen(['python', 'socket_5.py', args.socket_username, args.socket_password, '2', str(args.socket_port)])
+            tcpc.TcpClient(server_port=args.server_port,
+                           server_host=args.server_host,
+                           app_host=args.app_host,
+                           app_port=args.socket_port,
                            user_port=args.user_port).run()
         else:
-            socket_5.Socks5Handler.authenticated = 2
-            socket_5.Socks5Handler.username = args.socket_username
-            socket_5.Socks5Handler.password = args.socket_password
-            with ThreadingTCPServer(('0.0.0.0', args.socket_port), socket_5.Socks5Handler) as server:
-                server.serve_forever()
-            tcpc.TcpClient(server_port=args.server_port, server_host=args.server_host,app_host=args.app_host, app_port=args.socket_port,
-                          user_port=args.user_port).run()
+            raise ValueError('socket5 服务器用户名和密码必须同时填写')
+    else:
+        raise ValueError('-t 参数类型错误')

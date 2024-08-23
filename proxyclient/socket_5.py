@@ -1,26 +1,25 @@
-
 from sys import argv, path
 import os
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 path.append(BASE_DIR)
 import socket
 import struct
 import select
 from proxylog.log import Logger
+
 from socketserver import ThreadingTCPServer, StreamRequestHandler
 
 
-class Socks5Handler(StreamRequestHandler):
+class Proxysockets5(StreamRequestHandler):
     username = ""
     password = ""
     logger = Logger()
     # 认证标志
     authenticated = 0
 
-
-
     # 连接到socks5服务器后进行协商，处理连接请求
-    #重写handle方法
+    # 重写handle方法
     def handle(self):
         self.logger.info("Socks5初始化完成")
         self.logger.info(f"接收到来自{self.client_address}的连接请求")
@@ -95,16 +94,15 @@ class Socks5Handler(StreamRequestHandler):
                 self.server.close_request(self.request)
                 self.logger.error(f"请求类型：{cmd},不支持的命令,关闭连接")
                 return
-            # address = struct.unpack("!I", socket.inet_aton(bind_addr[0]))[0]
-            # port = bind_addr[1]
             reply = struct.pack("!BBBBIH", 5, 0, 0, 1, struct.unpack("!I", socket.inet_aton(bind_addr[0]))[0],
                                 bind_addr[1])
         except Exception as e:
             self.logger.error(f"连接失败：{e}")
-            #version, rep=5(表示连接超时),rsv(保留参数),atpy(地址类型),addr(地址),port(端口)
+
+            # version, rep=5(表示连接超时),rsv(保留参数),atpy(地址类型),addr(地址),port(端口)
             reply = struct.pack("!BBBBIH", 5, 5, 0, atpy, 0, 0)
         self.connection.sendall(reply)
-        #开始数据交换
+        # 开始数据交换
         # rep=0(表示成功)
         if reply[1] == 0 and cmd == 1:
             self.change_data(self.connection, remote_socket)
@@ -128,31 +126,28 @@ class Socks5Handler(StreamRequestHandler):
             self.logger.error(f"版本错误")
             raise Exception("版本错误")
 
-
     def change_data(self, client_socket, remote_socket):
         while True:
             readable, writable, exceptional = select.select([client_socket, remote_socket], [], [])
             if client_socket in readable:
                 data = client_socket.recv(2048)
-                if  remote_socket.send(data) <= 0:
+                if remote_socket.send(data) <= 0:
                     self.logger.info(f"客户端断开连接")
                     break
             if remote_socket in readable:
                 data = remote_socket.recv(2048)
-                if  client_socket.send(data) <= 0:
+                if client_socket.send(data) <= 0:
                     self.logger.info(f"服务端断开连接")
                     break
 
-def change_data(self, client_socket, remote_socket):
-    pass
 
 if __name__ == '__main__':
     username = argv[1]
     password = argv[2]
     authenticated = int(argv[3])
     server_port = int(argv[4])
-    Socks5Handler.username = username
-    Socks5Handler.password = password
-    Socks5Handler.authenticated = authenticated
-    with ThreadingTCPServer(('0.0.0.0', server_port), Socks5Handler) as server:
+    Proxysockets5.username = username
+    Proxysockets5.password = password
+    Proxysockets5.authenticated = authenticated
+    with ThreadingTCPServer(('0.0.0.0', server_port), Proxysockets5) as server:
         server.serve_forever()
